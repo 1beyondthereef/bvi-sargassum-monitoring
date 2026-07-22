@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Light-first, high-contrast theme for bright-sunlight readability.
+ * Ocean-tinted neutral background; deep ink foreground.
+ */
+:root {
+  --background: #f7fafc;
+  --foreground: #0c2837;
+}
+
+@layer base {
+  body {
+    color: var(--foreground);
+    background: var(--background);
+    @apply font-sans;
+  }
+
+  /* Headings automatically use the MADE Tommy display face */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
