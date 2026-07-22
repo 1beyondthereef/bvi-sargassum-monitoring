@@ -147,6 +147,16 @@ export function AdminDashboard() {
   const focusOn = (r: SargassumReport) =>
     setFocus({ lng: r.longitude, lat: r.latitude, nonce: Date.now() });
 
+  const exportCsv = () => {
+    const params = new URLSearchParams();
+    if (from) params.set("from", `${from}T00:00:00`);
+    if (to) params.set("to", `${to}T23:59:59.999`);
+    if (minSeverity > 0) params.set("min_severity", String(minSeverity));
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    else if (showHidden) params.set("include_hidden", "true");
+    window.location.href = `/api/admin/export?${params.toString()}`;
+  };
+
   return (
     <main className="min-h-dvh bg-background">
       {/* Header */}
@@ -228,9 +238,9 @@ export function AdminDashboard() {
           <div className="ml-auto pb-1">
             <button
               type="button"
-              disabled
-              title="CSV export is built in the next step"
-              className="cursor-not-allowed rounded-lg bg-sargassum-500 px-4 py-2 text-sm font-semibold text-sargassum-950 opacity-60"
+              onClick={exportCsv}
+              title="Download the filtered reports as CSV"
+              className="rounded-lg bg-sargassum-500 px-4 py-2 text-sm font-semibold text-sargassum-950 shadow-sm transition-colors hover:bg-sargassum-400"
             >
               Export CSV
             </button>

@@ -29,10 +29,33 @@ const inter = Inter({
   display: "swap",
 });
 
+const APP_TITLE = "BVI Sargassum Monitoring — Community Generated Data";
+const APP_DESCRIPTION =
+  "Help the Ministry of Environment, Natural Resources & Climate Change track and monitor sargassum across the Territory.";
+
 export const metadata: Metadata = {
-  title: "BVI Sargassum Monitoring — Community Data",
-  description:
-    "Help the Ministry of Environment, Natural Resources & Climate Change track and monitor sargassum across the Territory.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
+  title: APP_TITLE,
+  description: APP_DESCRIPTION,
+  applicationName: "BVI Sargassum Monitoring",
+  appleWebApp: {
+    capable: true,
+    title: "Sargassum BVI",
+    statusBarStyle: "default",
+  },
+  openGraph: {
+    type: "website",
+    siteName: "BVI Sargassum Monitoring",
+    title: APP_TITLE,
+    description: APP_DESCRIPTION,
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "BVI Sargassum Monitoring" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: APP_TITLE,
+    description: APP_DESCRIPTION,
+    images: ["/og.png"],
+  },
 };
 
 export const viewport: Viewport = {
