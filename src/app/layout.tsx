@@ -32,7 +32,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "BVI Sargassum Monitoring — Community Data",
   description:
-    "Help the Department of Conservation and Fisheries track sargassum across the territory.",
+    "Help the Ministry of Environment, Natural Resources & Climate Change track and monitor sargassum across the Territory.",
 };
 
 export const viewport: Viewport = {
