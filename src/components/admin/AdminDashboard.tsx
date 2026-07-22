@@ -165,16 +165,16 @@ export function AdminDashboard() {
           <h1 className="text-lg font-bold">Sargassum Reports — Admin</h1>
           <p className="text-xs text-ocean-100">BVI Sargassum Monitoring</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <button
             onClick={loadReports}
-            className="flex items-center gap-1 rounded-lg bg-ocean-700 px-3 py-2 text-sm font-medium hover:bg-ocean-600"
+            className="flex items-center gap-1 whitespace-nowrap rounded-lg bg-ocean-700 px-3 py-2 text-sm font-medium hover:bg-ocean-600"
           >
             <RefreshCw className="h-4 w-4" /> Refresh
           </button>
           <button
             onClick={logout}
-            className="flex items-center gap-1 rounded-lg bg-ocean-700 px-3 py-2 text-sm font-medium hover:bg-ocean-600"
+            className="flex items-center gap-1 whitespace-nowrap rounded-lg bg-ocean-700 px-3 py-2 text-sm font-medium hover:bg-ocean-600"
           >
             <LogOut className="h-4 w-4" /> Log out
           </button>
@@ -263,7 +263,11 @@ export function AdminDashboard() {
               <Loader2 className="h-5 w-5 animate-spin" /> Loading reports…
             </div>
           ) : visible.length === 0 ? (
-            <div className="p-8 text-center text-ocean-600">No reports match these filters.</div>
+            <div className="p-8 text-center text-ocean-600">
+              {reports.length === 0
+                ? "No reports have been submitted yet."
+                : "No reports match these filters."}
+            </div>
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-ocean-50 text-left text-ocean-800">
@@ -462,8 +466,8 @@ function DetailModal({
         {report.photo_urls.length > 0 && (
           <div className="mt-4 grid grid-cols-2 gap-2">
             {report.photo_urls.map((url, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
               <a key={i} href={url} target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={url} alt="" className="w-full rounded-lg object-cover" />
               </a>
             ))}
