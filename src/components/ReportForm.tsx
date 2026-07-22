@@ -96,25 +96,31 @@ export function ReportForm() {
       // Photos are compressed on submit (max ~1600px long edge, ~0.8 quality).
       const compressed = await compressImages(photos);
 
-      // TODO(step 4): POST to /api/reports with location, severity, health,
-      // comments, and `compressed` photos (server-side Storage upload + insert).
-      // For now the submission is mocked so the form flow is demonstrable end-to-end.
-      await new Promise((r) => setTimeout(r, 700));
-      console.log("[mock submit] payload:", {
-        latitude: location!.lat,
-        longitude: location!.lng,
-        severity,
-        health_impact: health,
-        comments: comments.trim() || null,
-        photoCount: compressed.length,
-      });
+      const body = new FormData();
+      body.append("latitude", String(location!.lat));
+      body.append("longitude", String(location!.lng));
+      body.append("severity", String(severity));
+      body.append("health_impact", String(health));
+      body.append("comments", comments.trim());
+      compressed.forEach((file, i) => body.append("photos", file, `photo-${i}.jpg`));
 
-      setSubmittedAt(new Date().toISOString());
+      const res = await fetch("/api/reports", { method: "POST", body });
+      const payload = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(payload?.error || "Submission failed.");
+      }
+
+      setSubmittedAt(payload.created_at ?? new Date().toISOString());
       setPhase("success");
       topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (err) {
       console.error("Submit failed:", err);
-      setErrorMsg("Something went wrong sending your report. Your details are still here — please try again.");
+      setErrorMsg(
+        err instanceof Error && err.message
+          ? `${err.message} Your details are still here — please try again.`
+          : "Something went wrong sending your report. Your details are still here — please try again."
+      );
       setPhase("error");
     }
   };

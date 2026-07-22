@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { publicEnv } from "@/lib/env";
+import { publicEnv, normalizeSupabaseUrl } from "@/lib/env";
 
 /**
  * Browser-safe Supabase client using the anon key.
@@ -18,7 +18,7 @@ export function createBrowserClient() {
     );
   }
 
-  return createClient(url, anonKey, {
+  return createClient(normalizeSupabaseUrl(url), anonKey, {
     auth: { persistSession: false },
   });
 }

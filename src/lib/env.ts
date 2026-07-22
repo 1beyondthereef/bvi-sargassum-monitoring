@@ -14,6 +14,21 @@ function required(name: string, value: string | undefined): string {
   return value;
 }
 
+/**
+ * Normalize a Supabase project URL to its origin.
+ * supabase-js expects the bare project URL (https://<ref>.supabase.co) and
+ * appends /rest/v1, /storage/v1, etc. itself. If the configured value includes
+ * a path (e.g. a trailing "/rest/v1/") or trailing slash, strip it to avoid
+ * doubled paths like //rest/v1 (PostgREST error PGRST125).
+ */
+export function normalizeSupabaseUrl(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return url.trim().replace(/\/+$/, "");
+  }
+}
+
 /** Public (browser-safe) environment. */
 export const publicEnv = {
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -30,7 +45,9 @@ export function getServerEnv() {
     throw new Error("[env] getServerEnv() must not be called in the browser");
   }
   return {
-    supabaseUrl: required("NEXT_PUBLIC_SUPABASE_URL", process.env.NEXT_PUBLIC_SUPABASE_URL),
+    supabaseUrl: normalizeSupabaseUrl(
+      required("NEXT_PUBLIC_SUPABASE_URL", process.env.NEXT_PUBLIC_SUPABASE_URL)
+    ),
     supabaseServiceRoleKey: required(
       "SUPABASE_SERVICE_ROLE_KEY",
       process.env.SUPABASE_SERVICE_ROLE_KEY
