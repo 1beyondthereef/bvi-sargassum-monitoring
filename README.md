@@ -1,9 +1,9 @@
 # BVI Sargassum Monitoring — Community Generated Data
 
-A public, mobile-first web app for the BVI Ministry of Environment, Natural
-Resources & Climate Change. Community members report sargassum sightings —
-no login, no download, no friction — and a password-protected admin dashboard
-lets the Ministry view, filter, and export all reports.
+A public, mobile-first web app for the BVI Department of Conservation and
+Fisheries. Community members report sargassum sightings — no login, no
+download, no friction — and a password-protected admin dashboard lets the
+Department view, filter, and export all reports.
 
 - **Public form** (`/`) — location (Mapbox pin picker), up to 3 photos
   (compressed client-side, uploaded on submit), severity and health-impact

@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "BVI Sargassum Monitoring",
     short_name: "Sargassum BVI",
     description:
-      "Report sargassum sightings to help the Ministry of Environment, Natural Resources & Climate Change monitor the Territory.",
+      "Report sargassum sightings to help the Department of Conservation and Fisheries monitor the Territory.",
     start_url: "/",
     display: "standalone",
     background_color: "#123950",

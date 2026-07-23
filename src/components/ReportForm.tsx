@@ -131,7 +131,7 @@ export function ReportForm() {
         <CheckCircle2 className="mx-auto h-16 w-16 text-severity-low" />
         <h2 className="mt-4 text-xl font-bold text-ocean-900">Thank you</h2>
         <p className="mt-2 text-ocean-700">
-          Your report has been received by the Ministry of Environment, Natural Resources &amp; Climate Change.
+          Your report has been received by the Department of Conservation and Fisheries.
         </p>
         {submittedAt && (
           <p className="mt-2 text-sm text-ocean-500">
@@ -180,7 +180,7 @@ export function ReportForm() {
         index={4}
         title="Health impact"
         required
-          caption="Decomposing sargassum can release hydrogen sulfide gas. Your answer helps the Ministry monitor community health effects."
+          caption="Decomposing sargassum can release hydrogen sulfide gas. Your answer helps the Department monitor community health effects."
       >
         <ScaleSlider
           value={health}

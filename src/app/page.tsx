@@ -35,8 +35,8 @@ export default function Home() {
         </div>
 
         <p className="mx-auto mt-3 max-w-md text-center text-sm text-ocean-50">
-          Help the Ministry of Environment, Natural Resources &amp; Climate
-          Change track and monitor sargassum across the Territory.
+            Help the Department of Conservation and Fisheries track and monitor
+            sargassum across the Territory.
         </p>
       </header>
 
@@ -51,7 +51,7 @@ export default function Home() {
         </p>
         <p className="mt-2 text-xs text-ocean-500">
           Reports are anonymous. Location, photos, and answers are shared with
-          the Ministry.
+          the Department.
         </p>
       </footer>
     </main>

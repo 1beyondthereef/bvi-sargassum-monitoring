@@ -31,7 +31,7 @@ const inter = Inter({
 
 const APP_TITLE = "BVI Sargassum Monitoring — Community Generated Data";
 const APP_DESCRIPTION =
-  "Help the Ministry of Environment, Natural Resources & Climate Change track and monitor sargassum across the Territory.";
+  "Help the Department of Conservation and Fisheries track and monitor sargassum across the Territory.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
