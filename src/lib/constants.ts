@@ -1,7 +1,17 @@
 /**
  * Shared constants for the BVI Sargassum Monitoring app.
- * Values sourced from SPEC.md (Sections 4.2, 5, 7).
+ * Values sourced from SPEC.md (Sections 4.2, 5, 7) and SPEC-V2.md.
  */
+
+// Governing body (SPEC-V2 A). Single source of truth for user-facing naming.
+export const MINISTRY_NAME =
+  "Ministry of Environment, Natural Resources and Climate Change";
+
+// SPEC-V2 A — exact wording pending Ministry confirmation.
+export const MINISTRY_ATTRIBUTION = `An initiative of the ${MINISTRY_NAME}, Government of the Virgin Islands.`;
+
+// Alt text for the official crest/wordmark lockup at public/ministry-logo.png
+export const MINISTRY_LOGO_ALT = `Government of the Virgin Islands — ${MINISTRY_NAME}`;
 
 // Map initial view for the public form (SPEC 4.2)
 export const MAP_INITIAL = {
