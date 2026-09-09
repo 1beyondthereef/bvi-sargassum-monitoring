@@ -10,6 +10,7 @@ import type { FeatureCollection } from "geojson";
 import { MapPin, Pencil, Plus, Minus, Trash2 } from "lucide-react";
 import { MAP_INITIAL, MAPBOX_STYLE } from "@/lib/constants";
 import { publicEnv } from "@/lib/env";
+import { polygonsCentroid } from "@/lib/geo";
 import { cn, formatArea } from "@/lib/utils";
 
 export interface DrawnArea {
@@ -18,7 +19,8 @@ export interface DrawnArea {
 }
 
 interface MapPickerProps {
-  onLocationSelect: (lat: number, lng: number) => void;
+  /** Null when the location is cleared (e.g. a derived pin's area was removed). */
+  onLocationSelect: (location: { lat: number; lng: number } | null) => void;
   className?: string;
   /** Enables polygon drawing for in-water extents (SPEC-V2 C2). */
   enableAreaDraw?: boolean;
@@ -95,9 +97,14 @@ export const MapPicker = forwardRef<MapPickerRef, MapPickerProps>(function MapPi
   const onSelectRef = useRef(onLocationSelect);
   const drawRef = useRef<MapboxDraw | null>(null);
   const onAreaChangeRef = useRef(onAreaChange);
+  const placeMarkerRef = useRef<((lng: number, lat: number, manual: boolean) => void) | null>(null);
+  // Once the reporter places or drags a pin themselves it stops following the
+  // drawn area, so their refinement isn't overwritten by the next edit.
+  const manualPinRef = useRef(false);
 
   const [isLoaded, setIsLoaded] = useState(false);
   const [selected, setSelected] = useState<{ lat: number; lng: number } | null>(null);
+  const [derivedPin, setDerivedPin] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const [mapError, setMapError] = useState(false);
@@ -144,27 +151,31 @@ export const MapPicker = forwardRef<MapPickerRef, MapPickerProps>(function MapPi
     map.dragRotate.disable();
     map.touchZoomRotate.disableRotation();
 
-    function placeMarker(lng: number, lat: number) {
+    function placeMarker(lng: number, lat: number, manual: boolean) {
       if (!mapRef.current) return;
+      if (manual) manualPinRef.current = true;
       if (markerRef.current) {
         markerRef.current.setLngLat([lng, lat]);
       } else {
         const marker = new mapboxgl.Marker({ color: MARKER_COLOR, draggable: true })
           .setLngLat([lng, lat])
           .addTo(mapRef.current);
+        // Dragging a derived pin is the reporter refining it, so it stops
+        // tracking the polygon from then on.
         marker.on("dragend", () => {
           const p = marker.getLngLat();
+          manualPinRef.current = true;
+          setDerivedPin(false);
           setSelected({ lat: p.lat, lng: p.lng });
-          onSelectRef.current(p.lat, p.lng);
+          onSelectRef.current({ lat: p.lat, lng: p.lng });
         });
         markerRef.current = marker;
       }
+      setDerivedPin(!manual);
       setSelected({ lat, lng });
-      onSelectRef.current(lat, lng);
+      onSelectRef.current({ lat, lng });
     }
-
-    // expose for geolocation handler
-    (map as unknown as { __place: typeof placeMarker }).__place = placeMarker;
+    placeMarkerRef.current = placeMarker;
 
     map.on("load", () => setIsLoaded(true));
     map.on("click", (e) => {
@@ -175,16 +186,27 @@ export const MapPicker = forwardRef<MapPickerRef, MapPickerProps>(function MapPi
         if (draw.getMode() !== "simple_select") return;
         if (draw.getFeatureIdsAt(e.point).length > 0) return;
       }
-      placeMarker(e.lngLat.lng, e.lngLat.lat);
+      placeMarker(e.lngLat.lng, e.lngLat.lat, true);
     });
 
     return () => {
       markerRef.current?.remove();
       markerRef.current = null;
+      placeMarkerRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
     };
   }, []);
+
+  /** Drop the pin the drawn area produced, unless the reporter set one themselves. */
+  const clearDerivedPin = () => {
+    if (manualPinRef.current) return;
+    markerRef.current?.remove();
+    markerRef.current = null;
+    setDerivedPin(false);
+    setSelected(null);
+    onSelectRef.current(null);
+  };
 
   // Attach/detach the polygon draw tool when the report type calls for it.
   useEffect(() => {
@@ -206,11 +228,19 @@ export const MapPicker = forwardRef<MapPickerRef, MapPickerProps>(function MapPi
       if (count === 0) {
         setAreaSqM(null);
         onAreaChangeRef.current?.(null);
+        clearDerivedPin();
         return;
       }
       const squareMeters = area(collection);
       setAreaSqM(squareMeters);
       onAreaChangeRef.current?.({ geojson: collection, squareMeters });
+
+      // A drawn extent satisfies the location on its own (SPEC-V2 C2): derive
+      // the pin from the centroid so the reporter isn't asked to do both.
+      if (!manualPinRef.current) {
+        const centre = polygonsCentroid(collection);
+        if (centre) placeMarkerRef.current?.(centre.lng, centre.lat, false);
+      }
     };
 
     const onModeChange = (e: { mode?: string }) => setDrawing(e.mode === "draw_polygon");
@@ -234,7 +264,11 @@ export const MapPicker = forwardRef<MapPickerRef, MapPickerProps>(function MapPi
       setAreaSqM(null);
       setShapeCount(0);
       onAreaChangeRef.current?.(null);
+      // Switching to a land-based report takes the extent away, so a pin that
+      // only existed because of it has to go too — land still requires one.
+      clearDerivedPin();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enableAreaDraw, isLoaded]);
 
   const startDrawing = () => {
@@ -251,6 +285,7 @@ export const MapPicker = forwardRef<MapPickerRef, MapPickerProps>(function MapPi
     setAreaSqM(null);
     setShapeCount(0);
     onAreaChangeRef.current?.(null);
+    clearDerivedPin();
   };
 
   const handleLocateMe = () => {
@@ -265,16 +300,15 @@ export const MapPicker = forwardRef<MapPickerRef, MapPickerProps>(function MapPi
         setLocating(false);
         const { latitude, longitude } = position.coords;
         const map = mapRef.current;
-        if (map) {
+        if (map && placeMarkerRef.current) {
           map.flyTo({ center: [longitude, latitude], zoom: MAP_INITIAL.locateZoom });
-          (map as unknown as { __place: (lng: number, lat: number) => void }).__place(
-            longitude,
-            latitude
-          );
+          placeMarkerRef.current(longitude, latitude, true);
         } else {
           // Map unavailable (e.g. no WebGL) — still record the location.
+          manualPinRef.current = true;
+          setDerivedPin(false);
           setSelected({ lat: latitude, lng: longitude });
-          onSelectRef.current(latitude, longitude);
+          onSelectRef.current({ lat: latitude, lng: longitude });
         }
       },
       () => {
@@ -323,10 +357,12 @@ export const MapPicker = forwardRef<MapPickerRef, MapPickerProps>(function MapPi
         )}
 
         {isLoaded && !drawing && !selected && (
-          <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-lg bg-white/95 px-3 py-2 shadow-md">
-            <p className="flex items-center gap-2 text-sm font-medium text-ocean-800">
-              <MapPin className="h-4 w-4 text-ocean-600" />
-              Tap the map to drop a pin
+          <div className="pointer-events-none absolute left-3 right-3 top-3 rounded-lg bg-white/95 px-3 py-2 shadow-md">
+            <p className="flex items-center justify-center gap-2 text-center text-sm font-medium text-ocean-800">
+              <MapPin className="h-4 w-4 shrink-0 text-ocean-600" />
+              {enableAreaDraw
+                ? "Draw the affected area, or tap to drop a pin"
+                : "Tap the map to drop a pin"}
             </p>
           </div>
         )}
@@ -397,7 +433,7 @@ export const MapPicker = forwardRef<MapPickerRef, MapPickerProps>(function MapPi
                 )}
               </>
             ) : (
-              "Optional — draw the affected water area, or just drop a pin above."
+              "Draw the affected water area, or drop a pin above — either one works."
             )}
           </p>
         </div>
@@ -408,11 +444,18 @@ export const MapPicker = forwardRef<MapPickerRef, MapPickerProps>(function MapPi
       <p className="text-sm text-ocean-700">
         {selected ? (
           <>
-            Selected:{" "}
+            {derivedPin ? "Centre of your drawn area:" : "Selected:"}{" "}
             <span className="font-mono font-medium">
               {selected.lat.toFixed(4)}, {selected.lng.toFixed(4)}
             </span>
+            {derivedPin && (
+              <span className="mt-1 block text-ocean-600">
+                Drag the pin if you&apos;d like to place it more precisely.
+              </span>
+            )}
           </>
+        ) : enableAreaDraw ? (
+          "Draw the affected area or drop a pin to set the location."
         ) : (
           "No location selected yet."
         )}

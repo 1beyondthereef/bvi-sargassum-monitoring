@@ -281,12 +281,12 @@ export function ReportForm() {
             required
             caption={
               showWater
-                ? "Drop a pin, and use Draw area to outline the affected water."
+                ? "Draw the affected area, or drop a pin — either sets the location."
                 : undefined
             }
           >
             <MapPicker
-              onLocationSelect={(lat, lng) => setLocation({ lat, lng })}
+              onLocationSelect={setLocation}
               className="h-[320px]"
               enableAreaDraw={showWater}
               onAreaChange={setDrawnArea}

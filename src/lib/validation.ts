@@ -14,6 +14,7 @@ import {
   type ImpactCategoryKey,
   type ReportType,
 } from "@/lib/constants";
+import { polygonsCentroid } from "@/lib/geo";
 import type { ImpactAnswers } from "@/lib/types";
 
 export interface ValidatedReport {
@@ -216,16 +217,6 @@ export function validateReportFields(raw: {
   shore_height: unknown;
   shore_coverage: unknown;
 }): ValidationResult {
-  const latitude = Number(raw.latitude);
-  const longitude = Number(raw.longitude);
-
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-    return { ok: false, error: "A valid location is required." };
-  }
-  if (!isWithinBviBounds(latitude, longitude)) {
-    return { ok: false, error: "Location is outside the BVI area." };
-  }
-
   const reportTypeRaw = raw.report_type == null ? "" : String(raw.report_type).trim();
   if (!REPORT_TYPE_VALUES.has(reportTypeRaw)) {
     return { ok: false, error: "Please choose what kind of stranding you're reporting." };
@@ -279,6 +270,40 @@ export function validateReportFields(raw: {
     if (!estimate.ok) return { ok: false, error: "That extent estimate isn't recognised." };
     // The drawn polygon is the measurement; the dropdown is only its fallback.
     area_estimate = area_geojson ? null : estimate.value;
+  }
+
+  // An explicit pin wins, but a drawn extent stands in for one (SPEC-V2 C2) so
+  // in-water reporters aren't made to both outline the sargassum and tap the
+  // map. Land-based reports have no extent, so the pin stays required there.
+  const pinProvided =
+    raw.latitude != null &&
+    raw.longitude != null &&
+    String(raw.latitude).trim() !== "" &&
+    String(raw.longitude).trim() !== "";
+
+  let latitude: number;
+  let longitude: number;
+  if (pinProvided) {
+    latitude = Number(raw.latitude);
+    longitude = Number(raw.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return { ok: false, error: "A valid location is required." };
+    }
+  } else {
+    const centre = polygonsCentroid(area_geojson);
+    if (!centre) {
+      return {
+        ok: false,
+        error: isWater
+          ? "Draw the affected area or drop a pin."
+          : "A valid location is required.",
+      };
+    }
+    latitude = centre.lat;
+    longitude = centre.lng;
+  }
+  if (!isWithinBviBounds(latitude, longitude)) {
+    return { ok: false, error: "Location is outside the BVI area." };
   }
 
   let comments: string | null = null;
