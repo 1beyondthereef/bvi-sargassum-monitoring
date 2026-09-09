@@ -117,7 +117,6 @@ export const SHORE_COVERAGE_OPTIONS = [
 ] as const;
 
 // In-water extent fallback for users who can't or won't draw (SPEC-V2 C2).
-// Polygon drawing arrives in build step 4.
 export const AREA_ESTIMATE_OPTIONS = [
   { value: "small", label: "Small", hint: "Under 0.5 hectares" },
   { value: "medium", label: "Medium", hint: "0.5–2 hectares" },
@@ -125,19 +124,30 @@ export const AREA_ESTIMATE_OPTIONS = [
   { value: "very_large", label: "Very large", hint: "Over 10 hectares" },
 ] as const;
 
+// Bounds on a submitted extent so a crafted request can't store an unbounded
+// blob in `area_geojson`.
+export const AREA_LIMITS = {
+  maxBytes: 100_000,
+  maxPolygons: 20,
+  maxVertices: 2000,
+} as const;
+
+/** Shoreline amount mapped onto the 1–10 scale, for admin display only. */
+const SHORE_AMOUNT_RANK: Record<string, number> = { light: 3, moderate: 6, heavy: 9 };
+
 /**
- * Interim bridge until the SPEC-V2 E migration (build step 7).
- *
- * Land-based reports replace the 1–10 slider with categories, but the API and
- * `sargassum_reports` still require a severity, and the admin map colors by it.
- * Map the amount category onto the legacy scale so submissions keep working;
- * remove this once `shore_amount` is a real column.
+ * Comparable severity for admin sorting, filtering, and map colour (SPEC-V2 F).
+ * Land-based rows carry no slider value, so fall back to the shoreline amount.
+ * Display only — this is never written to the database.
  */
-export const SHORE_AMOUNT_SEVERITY: Record<string, number> = {
-  light: 3,
-  moderate: 6,
-  heavy: 9,
-};
+export function severityRank(report: {
+  severity: number | null;
+  shore_amount?: string | null;
+}): number | null {
+  if (report.severity !== null) return report.severity;
+  if (report.shore_amount) return SHORE_AMOUNT_RANK[report.shore_amount] ?? null;
+  return null;
+}
 
 // Severity color buckets for the admin map (SPEC 6.2)
 export function severityBucket(severity: number): "low" | "mid" | "high" {

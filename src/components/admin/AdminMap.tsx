@@ -3,9 +3,11 @@
 import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { MAP_INITIAL, MAPBOX_STYLE, severityBucket } from "@/lib/constants";
+import { MAP_INITIAL, MAPBOX_STYLE, severityBucket, severityRank } from "@/lib/constants";
 import { publicEnv } from "@/lib/env";
 import type { SargassumReport } from "@/lib/types";
+
+const NO_SEVERITY_COLOR = "#64748b"; // rows with neither a slider value nor an amount
 
 const SEVERITY_COLORS: Record<"low" | "mid" | "high", string> = {
   low: "#16a34a",
@@ -72,7 +74,8 @@ export function AdminMap({ reports, onSelect, focus }: AdminMapProps) {
     markersRef.current = [];
 
     for (const report of reports) {
-      const color = SEVERITY_COLORS[severityBucket(report.severity)];
+      const rank = severityRank(report);
+      const color = rank === null ? NO_SEVERITY_COLOR : SEVERITY_COLORS[severityBucket(rank)];
       const popupNode = buildPopup(report, () => onSelectRef.current(report));
       const popup = new mapboxgl.Popup({ offset: 24, maxWidth: "260px" }).setDOMContent(
         popupNode
@@ -105,7 +108,7 @@ function buildPopup(report: SargassumReport, onDetails: () => void): HTMLElement
 
   const stats = document.createElement("div");
   stats.className = "mt-1";
-  stats.textContent = `Severity ${report.severity} · Health ${report.health_impact}`;
+  stats.textContent = `Severity ${report.severity ?? "—"} · Health ${report.health_impact ?? "—"}`;
   wrap.appendChild(stats);
 
   if (report.comments) {

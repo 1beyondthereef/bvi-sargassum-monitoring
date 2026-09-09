@@ -31,9 +31,15 @@ export async function POST(request: Request) {
   const validation = validateReportFields({
     latitude: form.get("latitude"),
     longitude: form.get("longitude"),
+    report_type: form.get("report_type"),
     severity: form.get("severity"),
     health_impact: form.get("health_impact"),
     comments: form.get("comments"),
+    area_geojson: form.get("area_geojson"),
+    area_estimate: form.get("area_estimate"),
+    shore_amount: form.get("shore_amount"),
+    shore_height: form.get("shore_height"),
+    shore_coverage: form.get("shore_coverage"),
   });
   if (!validation.ok) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
@@ -92,9 +98,15 @@ export async function POST(request: Request) {
       id: reportId,
       latitude: validation.data.latitude,
       longitude: validation.data.longitude,
+      report_type: validation.data.report_type,
       severity: validation.data.severity,
       health_impact: validation.data.health_impact,
       comments: validation.data.comments,
+      area_geojson: validation.data.area_geojson,
+      area_estimate: validation.data.area_estimate,
+      shore_amount: validation.data.shore_amount,
+      shore_height: validation.data.shore_height,
+      shore_coverage: validation.data.shore_coverage,
       photo_urls: photoUrls,
       user_agent: userAgent,
     })

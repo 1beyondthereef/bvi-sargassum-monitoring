@@ -14,7 +14,6 @@ import {
   FIELD_LIMITS,
   REPORT_TYPES,
   SHORE_AMOUNT_OPTIONS,
-  SHORE_AMOUNT_SEVERITY,
   SHORE_COVERAGE_OPTIONS,
   SHORE_HEIGHT_OPTIONS,
   type ReportType,
@@ -178,19 +177,29 @@ export function ReportForm() {
       // Photos are compressed on submit (max ~1600px long edge, ~0.8 quality).
       const compressed = await compressImages(photos);
 
-      // The SPEC-V2 E columns don't exist yet, so the new categorical answers
-      // are not sent; severity is derived from the amount category to keep
-      // land-based reports valid until build step 7 wires them up.
-      const effectiveSeverity = showSeverity
-        ? severity
-        : SHORE_AMOUNT_SEVERITY[shoreAmount ?? ""];
-
       const body = new FormData();
       body.append("latitude", String(location!.lat));
       body.append("longitude", String(location!.lng));
-      body.append("severity", String(effectiveSeverity));
+      body.append("report_type", String(reportType));
       body.append("health_impact", String(health));
       body.append("comments", comments.trim());
+
+      if (showSeverity && severity !== null) {
+        body.append("severity", String(severity));
+      }
+      if (showLand) {
+        body.append("shore_amount", String(shoreAmount));
+        body.append("shore_height", String(shoreHeight));
+        body.append("shore_coverage", String(shoreCoverage));
+      }
+      if (showWater) {
+        if (drawnArea) {
+          body.append("area_geojson", JSON.stringify(drawnArea.geojson));
+        } else if (areaEstimate) {
+          body.append("area_estimate", areaEstimate);
+        }
+      }
+
       compressed.forEach((file, i) => body.append("photos", file, `photo-${i}.jpg`));
 
       const res = await fetch("/api/reports", { method: "POST", body });

@@ -4,7 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Loader2, LogOut, RefreshCw } from "lucide-react";
-import { REPORT_STATUSES, severityBucket, type ReportStatus } from "@/lib/constants";
+import {
+  FIELD_LIMITS,
+  REPORT_STATUSES,
+  severityBucket,
+  severityRank,
+  type ReportStatus,
+} from "@/lib/constants";
 import type { SargassumReport } from "@/lib/types";
 
 const AdminMap = dynamic(() => import("@/components/admin/AdminMap").then((m) => m.AdminMap), {
@@ -25,9 +31,10 @@ const SEVERITY_DOT: Record<"low" | "mid" | "high", string> = {
   high: "bg-severity-high",
 };
 
-function mean(nums: number[]): string {
-  if (nums.length === 0) return "—";
-  return (nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1);
+function mean(nums: (number | null)[]): string {
+  const values = nums.filter((n): n is number => n !== null);
+  if (values.length === 0) return "—";
+  return (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
 }
 
 export function AdminDashboard() {
@@ -78,7 +85,7 @@ export function AdminDashboard() {
     return {
       total: base.length,
       last7: last7.length,
-      avgSeverity: mean(last7.map((r) => r.severity)),
+      avgSeverity: mean(last7.map((r) => severityRank(r))),
       avgHealth: mean(last7.map((r) => r.health_impact)),
     };
   }, [reports, showHidden]);
@@ -97,7 +104,12 @@ export function AdminDashboard() {
       const t = new Date(r.created_at).getTime();
       if (fromTime !== null && t < fromTime) return false;
       if (toTime !== null && t > toTime) return false;
-      if (r.severity < minSeverity) return false;
+      // Rows with no comparable severity are only dropped once the threshold
+      // is raised above its floor.
+      const rank = severityRank(r);
+      if (minSeverity > FIELD_LIMITS.severityMin && (rank === null || rank < minSeverity)) {
+        return false;
+      }
       return true;
     });
 
@@ -105,8 +117,9 @@ export function AdminDashboard() {
     return [...filtered].sort((a, b) => {
       let cmp = 0;
       if (sortKey === "date") cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      else if (sortKey === "severity") cmp = a.severity - b.severity;
-      else cmp = a.health_impact - b.health_impact;
+      else if (sortKey === "severity")
+        cmp = (severityRank(a) ?? -Infinity) - (severityRank(b) ?? -Infinity);
+      else cmp = (a.health_impact ?? -Infinity) - (b.health_impact ?? -Infinity);
       return cmp * dir;
     });
   }, [reports, statusFilter, showHidden, from, to, minSeverity, sortKey, sortDir]);
@@ -311,11 +324,19 @@ export function AdminDashboard() {
                     </td>
                     <td className="px-3 py-2">
                       <span className="inline-flex items-center gap-1">
-                        <span className={`h-2.5 w-2.5 rounded-full ${SEVERITY_DOT[severityBucket(r.severity)]}`} />
-                        {r.severity}
+                        <span
+                          className={`h-2.5 w-2.5 rounded-full ${
+                            severityRank(r) === null
+                              ? "bg-ocean-200"
+                              : SEVERITY_DOT[severityBucket(severityRank(r)!)]
+                          }`}
+                        />
+                        {r.severity ?? <span className="text-ocean-400">—</span>}
                       </span>
                     </td>
-                    <td className="px-3 py-2">{r.health_impact}</td>
+                    <td className="px-3 py-2">
+                      {r.health_impact ?? <span className="text-ocean-400">—</span>}
+                    </td>
                     <td className="max-w-[220px] truncate px-3 py-2 text-ocean-700">
                       {r.comments || <span className="text-ocean-400">—</span>}
                     </td>
@@ -444,8 +465,12 @@ function DetailModal({
               {report.latitude.toFixed(5)}, {report.longitude.toFixed(5)}
             </span>
           </Row>
-          <Row label="Severity">{report.severity} / 10</Row>
-          <Row label="Health impact">{report.health_impact} / 10</Row>
+          <Row label="Severity">
+            {report.severity === null ? "—" : `${report.severity} / 10`}
+          </Row>
+          <Row label="Health impact">
+            {report.health_impact === null ? "—" : `${report.health_impact} / 10`}
+          </Row>
           <Row label="Comments">{report.comments || "—"}</Row>
           <Row label="Status">
             <select
