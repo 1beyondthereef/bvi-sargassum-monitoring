@@ -6,7 +6,9 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 import { PhotoInput } from "@/components/PhotoInput";
 import { ScaleSlider } from "@/components/ScaleSlider";
 import { ChoiceGroup } from "@/components/ChoiceGroup";
+import type { DrawnArea } from "@/components/MapPicker";
 import { compressImages } from "@/lib/image-utils";
+import { formatArea } from "@/lib/utils";
 import {
   AREA_ESTIMATE_OPTIONS,
   FIELD_LIMITS,
@@ -96,7 +98,8 @@ export function ReportForm() {
   const [shoreAmount, setShoreAmount] = useState<string | null>(null);
   const [shoreHeight, setShoreHeight] = useState<string | null>(null);
   const [shoreCoverage, setShoreCoverage] = useState<string | null>(null);
-  // SPEC-V2 C2 fallback — polygon drawing arrives in build step 4
+  // SPEC-V2 C2 — drawn extent, with the size dropdown as the fallback
+  const [drawnArea, setDrawnArea] = useState<DrawnArea | null>(null);
   const [areaEstimate, setAreaEstimate] = useState<string | null>(null);
 
   const [phase, setPhase] = useState<Phase>("form");
@@ -141,6 +144,7 @@ export function ReportForm() {
     setShoreAmount(null);
     setShoreHeight(null);
     setShoreCoverage(null);
+    setDrawnArea(null);
     setAreaEstimate(null);
     setSubmittedAt(null);
     setErrorMsg(null);
@@ -159,7 +163,10 @@ export function ReportForm() {
       setShoreCoverage(null);
     } else {
       setSeverity(null);
-      if (next === "land") setAreaEstimate(null);
+      if (next === "land") {
+        setAreaEstimate(null);
+        setDrawnArea(null);
+      }
     }
   };
 
@@ -255,10 +262,21 @@ export function ReportForm() {
 
       {reportType && (
         <>
-          <FieldCard index={++step} title="Location" required>
+          <FieldCard
+            index={++step}
+            title="Location"
+            required
+            caption={
+              showWater
+                ? "Drop a pin, and use Draw area to outline the affected water."
+                : undefined
+            }
+          >
             <MapPicker
               onLocationSelect={(lat, lng) => setLocation({ lat, lng })}
               className="h-[320px]"
+              enableAreaDraw={showWater}
+              onAreaChange={setDrawnArea}
             />
           </FieldCard>
 
@@ -266,15 +284,30 @@ export function ReportForm() {
             <FieldCard
               index={++step}
               title="Extent in the water"
-              caption="Roughly how large is the affected water area? Drawing the area on the map is coming soon."
+              caption={
+                drawnArea
+                  ? undefined
+                  : "If you'd rather not draw the area, give us a rough size instead."
+              }
             >
-              <ChoiceGroup
-                name="area-estimate"
-                options={AREA_ESTIMATE_OPTIONS}
-                value={areaEstimate}
-                onChange={setAreaEstimate}
-                ariaLabel="Estimated size of the affected water area"
-              />
+              {drawnArea ? (
+                <p className="text-sm text-ocean-700">
+                  Using your drawn area of{" "}
+                  <span className="font-semibold">
+                    {formatArea(drawnArea.squareMeters)}
+                  </span>
+                  . Clear it on the map above if you&apos;d rather pick a rough
+                  size instead.
+                </p>
+              ) : (
+                <ChoiceGroup
+                  name="area-estimate"
+                  options={AREA_ESTIMATE_OPTIONS}
+                  value={areaEstimate}
+                  onChange={setAreaEstimate}
+                  ariaLabel="Estimated size of the affected water area"
+                />
+              )}
             </FieldCard>
           )}
 

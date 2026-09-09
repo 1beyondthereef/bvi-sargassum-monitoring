@@ -9,7 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@mapbox/mapbox-gl-draw": "^1.5.1",
     "@supabase/supabase-js": "^2.110.8",
+    "@turf/area": "^7.4.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.25.0",
     "mapbox-gl": "^3.26.0",
@@ -20,6 +22,7 @@
     "uuid": "^14.0.1"
   },
   "devDependencies": {
+    "@types/mapbox__mapbox-gl-draw": "^1.4.9",
     "@types/mapbox-gl": "^3.4.1",
     "@types/node": "^20",
     "@types/react": "^18",
