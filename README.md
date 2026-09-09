@@ -33,6 +33,7 @@ NEXT_PUBLIC_MAPBOX_TOKEN=          # Mapbox GL access token
 ADMIN_PASSWORD=                    # Shared password for /admin, checked server-side
 ADMIN_SESSION_SECRET=              # Random 32+ char string used to sign the admin cookie
 NEXT_PUBLIC_SITE_URL=              # Public site origin, used for OpenGraph/link previews (e.g. https://your-app.vercel.app)
+CRON_SECRET=                       # Random 32+ char string; authorizes the daily keep-alive cron
 ```
 
 Notes:
@@ -69,3 +70,17 @@ npm run lint         # eslint
 Add every variable listed above (including `NEXT_PUBLIC_SITE_URL`) in the
 Vercel project's Environment Variables, then deploy. Nothing else is required —
 this is a standalone web project.
+
+## Keep-alive cron
+
+Supabase pauses free-tier projects after roughly 7 consecutive days of
+inactivity. `vercel.json` schedules `GET /api/cron/keep-alive` daily at 12:00
+UTC (08:00 in the BVI); the route runs a `head`-only row count, so it touches
+the database without transferring rows.
+
+The route is protected: it requires `Authorization: Bearer $CRON_SECRET` and
+returns 401 for every request when `CRON_SECRET` is unset. Vercel attaches that
+header automatically to scheduled invocations once `CRON_SECRET` exists in the
+project's environment variables. Crons only run from a production deployment on
+the default branch, and Hobby projects are limited to one run per day (fired
+within the scheduled hour rather than exactly on it).
