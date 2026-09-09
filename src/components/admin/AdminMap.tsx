@@ -1,11 +1,19 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
+import type { Feature, FeatureCollection, Polygon } from "geojson";
 import { MAP_INITIAL, MAPBOX_STYLE, severityBucket, severityRank } from "@/lib/constants";
 import { publicEnv } from "@/lib/env";
+import { extentSummary, reportTypeLabel, shorelineSummary } from "@/lib/report-labels";
 import type { SargassumReport } from "@/lib/types";
+
+const AREA_SOURCE = "report-areas";
+const AREA_FILL_LAYER = "report-areas-fill";
+const AREA_LINE_LAYER = "report-areas-line";
+
+const EMPTY_COLLECTION: FeatureCollection = { type: "FeatureCollection", features: [] };
 
 const NO_SEVERITY_COLOR = "#64748b"; // rows with neither a slider value nor an amount
 
@@ -25,8 +33,8 @@ export function AdminMap({ reports, onSelect, focus }: AdminMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
-  const loadedRef = useRef(false);
   const onSelectRef = useRef(onSelect);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     onSelectRef.current = onSelect;
@@ -53,8 +61,23 @@ export function AdminMap({ reports, onSelect, focus }: AdminMapProps) {
     }
     mapRef.current = map;
     map.dragRotate.disable();
+
     map.on("load", () => {
-      loadedRef.current = true;
+      // Drawn extents render beneath the pins so markers stay clickable.
+      map.addSource(AREA_SOURCE, { type: "geojson", data: EMPTY_COLLECTION });
+      map.addLayer({
+        id: AREA_FILL_LAYER,
+        type: "fill",
+        source: AREA_SOURCE,
+        paint: { "fill-color": ["get", "color"], "fill-opacity": 0.3 },
+      });
+      map.addLayer({
+        id: AREA_LINE_LAYER,
+        type: "line",
+        source: AREA_SOURCE,
+        paint: { "line-color": ["get", "color"], "line-width": 2 },
+      });
+      setIsLoaded(true);
     });
 
     return () => {
@@ -64,6 +87,31 @@ export function AdminMap({ reports, onSelect, focus }: AdminMapProps) {
       mapRef.current = null;
     };
   }, []);
+
+  // Redraw in-water extents when the filtered set changes (SPEC-V2 F)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isLoaded) return;
+    const source = map.getSource(AREA_SOURCE) as mapboxgl.GeoJSONSource | undefined;
+    if (!source) return;
+
+    const features: Feature<Polygon>[] = [];
+    for (const report of reports) {
+      if (!report.area_geojson?.features?.length) continue;
+      const rank = severityRank(report);
+      const color = rank === null ? NO_SEVERITY_COLOR : SEVERITY_COLORS[severityBucket(rank)];
+      for (const feature of report.area_geojson.features) {
+        if (feature?.geometry?.type !== "Polygon") continue;
+        features.push({
+          type: "Feature",
+          geometry: feature.geometry,
+          properties: { color, reportId: report.id },
+        });
+      }
+    }
+
+    source.setData({ type: "FeatureCollection", features });
+  }, [reports, isLoaded]);
 
   // Rebuild markers when reports change
   useEffect(() => {
@@ -106,10 +154,33 @@ function buildPopup(report: SargassumReport, onDetails: () => void): HTMLElement
   date.textContent = new Date(report.created_at).toLocaleString();
   wrap.appendChild(date);
 
+  if (report.report_type) {
+    const type = document.createElement("div");
+    type.className = "mt-1 font-medium text-ocean-700";
+    type.textContent = reportTypeLabel(report.report_type);
+    wrap.appendChild(type);
+  }
+
   const stats = document.createElement("div");
   stats.className = "mt-1";
   stats.textContent = `Severity ${report.severity ?? "—"} · Health ${report.health_impact ?? "—"}`;
   wrap.appendChild(stats);
+
+  const shoreline = shorelineSummary(report);
+  if (shoreline) {
+    const line = document.createElement("div");
+    line.className = "mt-1 text-slate-600";
+    line.textContent = shoreline;
+    wrap.appendChild(line);
+  }
+
+  const extent = extentSummary(report);
+  if (extent) {
+    const line = document.createElement("div");
+    line.className = "mt-1 text-slate-600";
+    line.textContent = `Extent: ${extent}`;
+    wrap.appendChild(line);
+  }
 
   if (report.comments) {
     const c = document.createElement("div");

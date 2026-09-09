@@ -124,6 +124,20 @@ export const AREA_ESTIMATE_OPTIONS = [
   { value: "very_large", label: "Very large", hint: "Over 10 hectares" },
 ] as const;
 
+/**
+ * Impact categories (SPEC-V2 C6). The questions themselves land in build step
+ * 6; this ordering is what the admin detail view and the CSV columns key off,
+ * so both stay in step with whatever step 6 stores in `impacts`.
+ */
+export const IMPACT_CATEGORIES = [
+  { key: "health", label: "Health" },
+  { key: "household", label: "Household / property" },
+  { key: "environmental", label: "Environmental" },
+  { key: "fishing", label: "Fishing & boating" },
+  { key: "economic", label: "Economic" },
+] as const;
+export type ImpactCategoryKey = (typeof IMPACT_CATEGORIES)[number]["key"];
+
 // Bounds on a submitted extent so a crafted request can't store an unbounded
 // blob in `area_geojson`.
 export const AREA_LIMITS = {

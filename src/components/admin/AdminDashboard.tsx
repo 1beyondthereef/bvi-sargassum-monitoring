@@ -6,11 +6,25 @@ import { useRouter } from "next/navigation";
 import { Loader2, LogOut, RefreshCw } from "lucide-react";
 import {
   FIELD_LIMITS,
+  IMPACT_CATEGORIES,
   REPORT_STATUSES,
+  REPORT_TYPES,
+  SHORE_AMOUNT_OPTIONS,
   severityBucket,
   severityRank,
   type ReportStatus,
 } from "@/lib/constants";
+import {
+  areaHectares,
+  extentSummary,
+  impactCell,
+  reportTypeLabel,
+  reportTypeShortLabel,
+  shoreAmountLabel,
+  shoreCoverageLabel,
+  shoreHeightLabel,
+  shorelineSummary,
+} from "@/lib/report-labels";
 import type { SargassumReport } from "@/lib/types";
 
 const AdminMap = dynamic(() => import("@/components/admin/AdminMap").then((m) => m.AdminMap), {
@@ -22,8 +36,21 @@ const AdminMap = dynamic(() => import("@/components/admin/AdminMap").then((m) =>
   ),
 });
 
+const ReportAreaMap = dynamic(
+  () => import("@/components/admin/ReportAreaMap").then((m) => m.ReportAreaMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-48 items-center justify-center rounded-lg bg-ocean-50 text-sm text-ocean-700">
+        Loading map…
+      </div>
+    ),
+  }
+);
+
 type SortKey = "date" | "severity" | "health";
 type StatusFilter = "all" | ReportStatus;
+type TypeFilter = "all" | string;
 
 const SEVERITY_DOT: Record<"low" | "mid" | "high", string> = {
   low: "bg-severity-low",
@@ -46,6 +73,8 @@ export function AdminDashboard() {
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [amountFilter, setAmountFilter] = useState<TypeFilter>("all");
   const [minSeverity, setMinSeverity] = useState(0);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -101,6 +130,8 @@ export function AdminDashboard() {
       } else if (!showHidden && r.status === "hidden") {
         return false;
       }
+      if (typeFilter !== "all" && r.report_type !== typeFilter) return false;
+      if (amountFilter !== "all" && r.shore_amount !== amountFilter) return false;
       const t = new Date(r.created_at).getTime();
       if (fromTime !== null && t < fromTime) return false;
       if (toTime !== null && t > toTime) return false;
@@ -122,7 +153,18 @@ export function AdminDashboard() {
       else cmp = (a.health_impact ?? -Infinity) - (b.health_impact ?? -Infinity);
       return cmp * dir;
     });
-  }, [reports, statusFilter, showHidden, from, to, minSeverity, sortKey, sortDir]);
+  }, [
+    reports,
+    statusFilter,
+    typeFilter,
+    amountFilter,
+    showHidden,
+    from,
+    to,
+    minSeverity,
+    sortKey,
+    sortDir,
+  ]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -165,6 +207,8 @@ export function AdminDashboard() {
     if (from) params.set("from", `${from}T00:00:00`);
     if (to) params.set("to", `${to}T23:59:59.999`);
     if (minSeverity > 0) params.set("min_severity", String(minSeverity));
+    if (typeFilter !== "all") params.set("report_type", typeFilter);
+    if (amountFilter !== "all") params.set("shore_amount", amountFilter);
     if (statusFilter !== "all") params.set("status", statusFilter);
     else if (showHidden) params.set("include_hidden", "true");
     window.location.href = `/api/admin/export?${params.toString()}`;
@@ -221,6 +265,34 @@ export function AdminDashboard() {
               {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
                 <option key={n} value={n}>
                   {n}+
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Type">
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="input"
+            >
+              <option value="all">All</option>
+              {REPORT_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Amount">
+            <select
+              value={amountFilter}
+              onChange={(e) => setAmountFilter(e.target.value)}
+              className="input"
+            >
+              <option value="all">All</option>
+              {SHORE_AMOUNT_OPTIONS.map((a) => (
+                <option key={a.value} value={a.value}>
+                  {a.label}
                 </option>
               ))}
             </select>
@@ -288,6 +360,7 @@ export function AdminDashboard() {
                   <Th onClick={() => toggleSort("date")} active={sortKey === "date"} dir={sortDir}>
                     Date
                   </Th>
+                  <th className="px-3 py-2 font-semibold">Type</th>
                   <th className="px-3 py-2 font-semibold">Location</th>
                   <Th onClick={() => toggleSort("severity")} active={sortKey === "severity"} dir={sortDir}>
                     Severity
@@ -295,6 +368,8 @@ export function AdminDashboard() {
                   <Th onClick={() => toggleSort("health")} active={sortKey === "health"} dir={sortDir}>
                     Health
                   </Th>
+                  <th className="px-3 py-2 font-semibold">Shoreline</th>
+                  <th className="px-3 py-2 font-semibold">Extent</th>
                   <th className="px-3 py-2 font-semibold">Comment</th>
                   <th className="px-3 py-2 font-semibold">Photos</th>
                   <th className="px-3 py-2 font-semibold">Status</th>
@@ -312,6 +387,13 @@ export function AdminDashboard() {
                           minute: "2-digit",
                         })}
                       </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      {r.report_type ? (
+                        reportTypeShortLabel(r.report_type)
+                      ) : (
+                        <span className="text-ocean-400">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <button
@@ -336,6 +418,12 @@ export function AdminDashboard() {
                     </td>
                     <td className="px-3 py-2">
                       {r.health_impact ?? <span className="text-ocean-400">—</span>}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-ocean-700">
+                      {shorelineSummary(r) || <span className="text-ocean-400">—</span>}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-xs text-ocean-700">
+                      {extentSummary(r) || <span className="text-ocean-400">—</span>}
                     </td>
                     <td className="max-w-[220px] truncate px-3 py-2 text-ocean-700">
                       {r.comments || <span className="text-ocean-400">—</span>}
@@ -460,6 +548,7 @@ function DetailModal({
 
         <dl className="space-y-2 text-sm">
           <Row label="Submitted">{new Date(report.created_at).toLocaleString()}</Row>
+          <Row label="Type">{reportTypeLabel(report.report_type) || "—"}</Row>
           <Row label="Location">
             <span className="font-mono">
               {report.latitude.toFixed(5)}, {report.longitude.toFixed(5)}
@@ -468,6 +557,16 @@ function DetailModal({
           <Row label="Severity">
             {report.severity === null ? "—" : `${report.severity} / 10`}
           </Row>
+          {report.shore_amount && (
+            <>
+              <Row label="Amount">{shoreAmountLabel(report.shore_amount)}</Row>
+              <Row label="Seaweed height">{shoreHeightLabel(report.shore_height)}</Row>
+              <Row label="Shoreline coverage">
+                {shoreCoverageLabel(report.shore_coverage)}
+              </Row>
+            </>
+          )}
+          {extentSummary(report) && <Row label="Extent">{extentSummary(report)}</Row>}
           <Row label="Health impact">
             {report.health_impact === null ? "—" : `${report.health_impact} / 10`}
           </Row>
@@ -487,6 +586,34 @@ function DetailModal({
             </select>
           </Row>
         </dl>
+
+        {report.area_geojson && areaHectares(report.area_geojson) !== null && (
+          <div className="mt-4">
+            <h3 className="mb-2 text-sm font-semibold text-ocean-800">Drawn extent</h3>
+            <ReportAreaMap
+              geojson={report.area_geojson}
+              latitude={report.latitude}
+              longitude={report.longitude}
+            />
+          </div>
+        )}
+
+        {report.impacts && (
+          <div className="mt-4">
+            <h3 className="mb-2 text-sm font-semibold text-ocean-800">Reported impacts</h3>
+            <dl className="space-y-2 text-sm">
+              {IMPACT_CATEGORIES.map(({ key, label }) => {
+                const value = impactCell(report.impacts, key);
+                if (!value) return null;
+                return (
+                  <Row key={key} label={label}>
+                    {value}
+                  </Row>
+                );
+              })}
+            </dl>
+          </div>
+        )}
 
         {report.photo_urls.length > 0 && (
           <div className="mt-4 grid grid-cols-2 gap-2">

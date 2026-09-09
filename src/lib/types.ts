@@ -1,5 +1,13 @@
 import type { FeatureCollection } from "geojson";
-import type { ReportStatus, ReportType } from "@/lib/constants";
+import type { ImpactCategoryKey, ReportStatus, ReportType } from "@/lib/constants";
+
+/** One impact category's answers (SPEC-V2 C6). */
+export interface ImpactAnswer {
+  selections?: string[];
+  other?: string;
+}
+
+export type ImpactAnswers = Partial<Record<ImpactCategoryKey, ImpactAnswer>>;
 
 /** A row in the `sargassum_reports` table. */
 export interface SargassumReport {
@@ -22,5 +30,5 @@ export interface SargassumReport {
   shore_amount: string | null;
   shore_height: string | null;
   shore_coverage: string | null;
-  impacts: Record<string, unknown> | null;
+  impacts: ImpactAnswers | null;
 }

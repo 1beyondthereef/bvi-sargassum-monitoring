@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { REPORT_STATUSES } from "@/lib/constants";
+import {
+  REPORT_STATUSES,
+  REPORT_TYPES,
+  SHORE_AMOUNT_OPTIONS,
+  severityRank,
+} from "@/lib/constants";
+import type { SargassumReport } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -14,7 +20,9 @@ export async function GET(request: Request) {
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const status = searchParams.get("status");
-  const minSeverity = searchParams.get("min_severity");
+  const reportType = searchParams.get("report_type");
+  const shoreAmount = searchParams.get("shore_amount");
+  const minSeverity = Number(searchParams.get("min_severity"));
 
   const supabase = createAdminClient();
   let query = supabase
@@ -27,8 +35,11 @@ export async function GET(request: Request) {
   if (status && (REPORT_STATUSES as readonly string[]).includes(status)) {
     query = query.eq("status", status);
   }
-  if (minSeverity && Number.isFinite(Number(minSeverity))) {
-    query = query.gte("severity", Number(minSeverity));
+  if (reportType && REPORT_TYPES.some((t) => t.value === reportType)) {
+    query = query.eq("report_type", reportType);
+  }
+  if (shoreAmount && SHORE_AMOUNT_OPTIONS.some((a) => a.value === shoreAmount)) {
+    query = query.eq("shore_amount", shoreAmount);
   }
 
   const { data, error } = await query;
@@ -37,5 +48,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Could not load reports." }, { status: 500 });
   }
 
-  return NextResponse.json({ reports: data ?? [] });
+  let reports = (data ?? []) as SargassumReport[];
+
+  // Ranked in JS, not SQL: land-based rows have no slider value and rank by
+  // shoreline amount, so a `severity >= n` filter would drop them all.
+  if (Number.isFinite(minSeverity) && minSeverity > 0) {
+    reports = reports.filter((r) => {
+      const rank = severityRank(r);
+      return rank !== null && rank >= minSeverity;
+    });
+  }
+
+  return NextResponse.json({ reports });
 }
