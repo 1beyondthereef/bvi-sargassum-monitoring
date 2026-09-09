@@ -3,14 +3,18 @@ import {
   AREA_ESTIMATE_OPTIONS,
   AREA_LIMITS,
   FIELD_LIMITS,
+  IMPACT_CATEGORIES,
+  IMPACT_LIMITS,
   PHOTO_LIMITS,
   REPORT_TYPES,
   SHORE_AMOUNT_OPTIONS,
   SHORE_COVERAGE_OPTIONS,
   SHORE_HEIGHT_OPTIONS,
   isWithinBviBounds,
+  type ImpactCategoryKey,
   type ReportType,
 } from "@/lib/constants";
+import type { ImpactAnswers } from "@/lib/types";
 
 export interface ValidatedReport {
   latitude: number;
@@ -24,6 +28,7 @@ export interface ValidatedReport {
   shore_amount: string | null;
   shore_height: string | null;
   shore_coverage: string | null;
+  impacts: ImpactAnswers | null;
 }
 
 export type ValidationResult =
@@ -122,6 +127,77 @@ function parseAreaGeojson(
   return { ok: true, value: fc };
 }
 
+const IMPACT_OPTION_VALUES = new Map<string, Set<string>>(
+  IMPACT_CATEGORIES.map((c) => [c.key, new Set(c.options.map((o) => o.value))])
+);
+
+/**
+ * Parse the optional structured impact answers (SPEC-V2 C6). Unknown categories
+ * and unknown option codes are rejected rather than quietly stored, so the
+ * column only ever holds values the admin dashboard and CSV know how to label.
+ */
+function parseImpacts(
+  raw: unknown
+): { ok: true; value: ImpactAnswers | null } | { ok: false; error: string } {
+  if (raw == null || String(raw).trim() === "") return { ok: true, value: null };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(String(raw));
+  } catch {
+    return { ok: false, error: "Your impact answers could not be read." };
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return { ok: false, error: "Your impact answers are not in the expected format." };
+  }
+
+  const result: ImpactAnswers = {};
+  for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+    const allowed = IMPACT_OPTION_VALUES.get(key);
+    if (!allowed) return { ok: false, error: "That impact category isn't recognised." };
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return { ok: false, error: "Your impact answers are not in the expected format." };
+    }
+
+    const { selections: rawSelections, other: rawOther } = value as {
+      selections?: unknown;
+      other?: unknown;
+    };
+
+    let selections: string[] = [];
+    if (rawSelections != null) {
+      if (!Array.isArray(rawSelections)) {
+        return { ok: false, error: "Your impact answers are not in the expected format." };
+      }
+      for (const item of rawSelections) {
+        if (typeof item !== "string" || !allowed.has(item)) {
+          return { ok: false, error: "That impact answer isn't recognised." };
+        }
+      }
+      // De-duplicate, and drop "none" if it arrived alongside real selections.
+      selections = Array.from(new Set(rawSelections as string[]));
+      if (selections.length > 1) selections = selections.filter((s) => s !== "none");
+    }
+
+    let other: string | undefined;
+    if (rawOther != null && String(rawOther).trim() !== "") {
+      const text = String(rawOther).trim();
+      if (text.length > IMPACT_LIMITS.otherMaxChars) {
+        return {
+          ok: false,
+          error: `Impact descriptions must be ${IMPACT_LIMITS.otherMaxChars} characters or fewer.`,
+        };
+      }
+      other = text;
+    }
+
+    if (selections.length === 0 && other === undefined) continue;
+    result[key as ImpactCategoryKey] = { ...(selections.length > 0 && { selections }), ...(other !== undefined && { other }) };
+  }
+
+  return { ok: true, value: Object.keys(result).length > 0 ? result : null };
+}
+
 /**
  * Validate the non-photo fields of a report submission (SPEC 5, SPEC-V2 C).
  * Which fields are required depends on the stranding type; answers that don't
@@ -132,8 +208,8 @@ export function validateReportFields(raw: {
   longitude: unknown;
   report_type: unknown;
   severity: unknown;
-  health_impact: unknown;
   comments: unknown;
+  impacts: unknown;
   area_geojson: unknown;
   area_estimate: unknown;
   shore_amount: unknown;
@@ -158,15 +234,10 @@ export function validateReportFields(raw: {
   const isWater = report_type === "in_water" || report_type === "mixed";
   const isLand = report_type === "land" || report_type === "mixed";
 
-  // Health impact stays a 1–10 scale until the structured section (SPEC-V2 C6).
-  const health_impact = Number(raw.health_impact);
-  if (
-    !isInt(health_impact) ||
-    health_impact < FIELD_LIMITS.healthMin ||
-    health_impact > FIELD_LIMITS.healthMax
-  ) {
-    return { ok: false, error: "Health impact must be a whole number from 1 to 10." };
-  }
+  // The 1–10 health slider is gone (SPEC-V2 C6): new rows leave the column null
+  // and carry their answers in `impacts` instead. v1 rows keep their value.
+  const impacts = parseImpacts(raw.impacts);
+  if (!impacts.ok) return { ok: false, error: impacts.error };
 
   // In-water reports keep the 1–10 severity slider; land-based reports replace
   // it with the shoreline categories (SPEC-V2 C3).
@@ -229,13 +300,14 @@ export function validateReportFields(raw: {
       longitude,
       report_type,
       severity,
-      health_impact,
+      health_impact: null,
       comments,
       area_geojson,
       area_estimate,
       shore_amount,
       shore_height,
       shore_coverage,
+      impacts: impacts.value,
     },
   };
 }

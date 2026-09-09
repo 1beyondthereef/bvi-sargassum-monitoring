@@ -2,6 +2,7 @@ import area from "@turf/area";
 import type { FeatureCollection } from "geojson";
 import {
   AREA_ESTIMATE_OPTIONS,
+  IMPACT_CATEGORIES,
   REPORT_TYPES,
   SHORE_AMOUNT_OPTIONS,
   SHORE_COVERAGE_OPTIONS,
@@ -75,11 +76,43 @@ export function extentSummary(report: SargassumReport): string {
   return areaEstimateLabel(report.area_estimate);
 }
 
-/** Flatten one impact category to "selection; selection; free text" (SPEC-V2 F). */
+const IMPACT_OPTION_LABELS = new Map(
+  IMPACT_CATEGORIES.map((c) => [
+    c.key as string,
+    new Map(c.options.map((o) => [o.value as string, o.label as string])),
+  ])
+);
+
+/**
+ * Flatten one impact category to "Selection; Selection; free text" (SPEC-V2 F).
+ * Stored option codes are resolved to their form wording so the CSV reads the
+ * way the Ministry saw the question.
+ */
 export function impactCell(impacts: ImpactAnswers | null, key: string): string {
   const answer = impacts?.[key as keyof ImpactAnswers] as ImpactAnswer | undefined;
   if (!answer) return "";
-  const parts = [...(answer.selections ?? [])];
+  const labels = IMPACT_OPTION_LABELS.get(key);
+  const parts = (answer.selections ?? []).map((s) => labels?.get(s) ?? s);
   if (answer.other && answer.other.trim() !== "") parts.push(answer.other.trim());
   return parts.join("; ");
+}
+
+/** True when the category holds an actual impact rather than an explicit "None". */
+function isRealImpact(answer: ImpactAnswer | undefined): boolean {
+  if (!answer) return false;
+  if ((answer.other ?? "").trim() !== "") return true;
+  return (answer.selections ?? []).some((s) => s !== "none");
+}
+
+/** Categories where the reporter recorded an impact, for the table and stats. */
+export function impactedCategories(impacts: ImpactAnswers | null): string[] {
+  if (!impacts) return [];
+  return IMPACT_CATEGORIES.filter((c) => isRealImpact(impacts[c.key])).map((c) => c.shortLabel);
+}
+
+/** "Health, Fishing", "None reported", or "" when the section was skipped. */
+export function impactsSummary(impacts: ImpactAnswers | null): string {
+  if (!impacts || Object.keys(impacts).length === 0) return "";
+  const hit = impactedCategories(impacts);
+  return hit.length > 0 ? hit.join(", ") : "None reported";
 }

@@ -33,8 +33,8 @@ export async function POST(request: Request) {
     longitude: form.get("longitude"),
     report_type: form.get("report_type"),
     severity: form.get("severity"),
-    health_impact: form.get("health_impact"),
     comments: form.get("comments"),
+    impacts: form.get("impacts"),
     area_geojson: form.get("area_geojson"),
     area_estimate: form.get("area_estimate"),
     shore_amount: form.get("shore_amount"),
@@ -107,6 +107,7 @@ export async function POST(request: Request) {
       shore_amount: validation.data.shore_amount,
       shore_height: validation.data.shore_height,
       shore_coverage: validation.data.shore_coverage,
+      impacts: validation.data.impacts,
       photo_urls: photoUrls,
       user_agent: userAgent,
     })

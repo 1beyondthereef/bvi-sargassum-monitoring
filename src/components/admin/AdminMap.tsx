@@ -6,7 +6,12 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import type { Feature, FeatureCollection, Polygon } from "geojson";
 import { MAP_INITIAL, MAPBOX_STYLE, severityBucket, severityRank } from "@/lib/constants";
 import { publicEnv } from "@/lib/env";
-import { extentSummary, reportTypeLabel, shorelineSummary } from "@/lib/report-labels";
+import {
+  extentSummary,
+  impactsSummary,
+  reportTypeLabel,
+  shorelineSummary,
+} from "@/lib/report-labels";
 import type { SargassumReport } from "@/lib/types";
 
 const AREA_SOURCE = "report-areas";
@@ -163,8 +168,17 @@ function buildPopup(report: SargassumReport, onDetails: () => void): HTMLElement
 
   const stats = document.createElement("div");
   stats.className = "mt-1";
-  stats.textContent = `Severity ${report.severity ?? "—"} · Health ${report.health_impact ?? "—"}`;
+  const rank = severityRank(report);
+  stats.textContent = `Severity ${rank === null ? "—" : rank}`;
   wrap.appendChild(stats);
+
+  const impacts = impactsSummary(report.impacts);
+  if (impacts) {
+    const line = document.createElement("div");
+    line.className = "mt-1 text-slate-600";
+    line.textContent = `Impacts: ${impacts}`;
+    wrap.appendChild(line);
+  }
 
   const shoreline = shorelineSummary(report);
   if (shoreline) {

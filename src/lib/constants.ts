@@ -125,18 +125,84 @@ export const AREA_ESTIMATE_OPTIONS = [
 ] as const;
 
 /**
- * Impact categories (SPEC-V2 C6). The questions themselves land in build step
- * 6; this ordering is what the admin detail view and the CSV columns key off,
- * so both stay in step with whatever step 6 stores in `impacts`.
+ * Impact categories and their options (SPEC-V2 C6). Every category is optional,
+ * multi-select, and carries a free-text "other". This ordering drives the form,
+ * the admin detail view, and the CSV columns alike.
+ *
+ * `none` is mutually exclusive with the other options in its category, which is
+ * what lets the admin side tell "reported no impact" apart from "didn't answer".
  */
 export const IMPACT_CATEGORIES = [
-  { key: "health", label: "Health" },
-  { key: "household", label: "Household / property" },
-  { key: "environmental", label: "Environmental" },
-  { key: "fishing", label: "Fishing & boating" },
-  { key: "economic", label: "Economic" },
+  {
+    key: "health",
+    label: "Health",
+    shortLabel: "Health",
+    // SPEC-V2 C6/H: the Environmental Health Division of the Ministry of Health
+    // and Social Development has not signed off on this list, so the form says so.
+    draft: true,
+    options: [
+      { value: "none", label: "None" },
+      { value: "eye_irritation", label: "Eye irritation" },
+      { value: "respiratory_irritation", label: "Respiratory irritation" },
+      { value: "headache", label: "Headache" },
+      { value: "nausea", label: "Nausea" },
+      { value: "skin_irritation", label: "Skin irritation" },
+    ],
+  },
+  {
+    key: "household",
+    label: "Household / property",
+    shortLabel: "Household",
+    options: [
+      { value: "none", label: "None" },
+      { value: "odour_in_home", label: "Odour in the home" },
+      { value: "corrosion", label: "Corrosion (metals, electronics)" },
+      { value: "property_damage", label: "Property damage" },
+    ],
+  },
+  {
+    key: "environmental",
+    label: "Environmental",
+    shortLabel: "Environment",
+    options: [
+      { value: "none", label: "None" },
+      { value: "discoloured_water", label: "Discoloured water" },
+      { value: "dead_marine_life", label: "Dead fish or marine life" },
+      { value: "water_quality", label: "Water quality concerns" },
+    ],
+  },
+  {
+    key: "fishing",
+    label: "Fishing & boating",
+    shortLabel: "Fishing",
+    options: [
+      { value: "none", label: "None" },
+      { value: "fouled_gear", label: "Fouled gear" },
+      { value: "blocked_ramp", label: "Blocked ramp or mooring" },
+      { value: "engine_intake", label: "Engine intake issues" },
+      { value: "navigation_hazard", label: "Navigation hazard" },
+    ],
+  },
+  {
+    key: "economic",
+    label: "Economic",
+    shortLabel: "Economic",
+    options: [
+      { value: "none", label: "None" },
+      { value: "lost_bookings", label: "Lost bookings or customers" },
+      { value: "cleanup_costs", label: "Cleanup costs" },
+      { value: "lost_fishing_income", label: "Lost fishing income" },
+    ],
+  },
 ] as const;
 export type ImpactCategoryKey = (typeof IMPACT_CATEGORIES)[number]["key"];
+
+/** Shown wherever the draft health list appears (SPEC-V2 C6). */
+export const HEALTH_DRAFT_NOTE = "Draft — pending Environmental Health Division review";
+
+export const IMPACT_LIMITS = {
+  otherMaxChars: 300,
+} as const;
 
 // Bounds on a submitted extent so a crafted request can't store an unbounded
 // blob in `area_geojson`.

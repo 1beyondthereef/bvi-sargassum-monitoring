@@ -18,6 +18,8 @@ import {
   areaHectares,
   extentSummary,
   impactCell,
+  impactedCategories,
+  impactsSummary,
   reportTypeLabel,
   reportTypeShortLabel,
   shoreAmountLabel,
@@ -48,7 +50,7 @@ const ReportAreaMap = dynamic(
   }
 );
 
-type SortKey = "date" | "severity" | "health";
+type SortKey = "date" | "severity" | "impacts";
 type StatusFilter = "all" | ReportStatus;
 type TypeFilter = "all" | string;
 
@@ -115,7 +117,9 @@ export function AdminDashboard() {
       total: base.length,
       last7: last7.length,
       avgSeverity: mean(last7.map((r) => severityRank(r))),
-      avgHealth: mean(last7.map((r) => r.health_impact)),
+      // The 1–10 health slider is retired (SPEC-V2 C6), so this counts reports
+      // that named at least one impact category instead of averaging a scale.
+      withImpacts: last7.filter((r) => impactedCategories(r.impacts).length > 0).length,
     };
   }, [reports, showHidden]);
 
@@ -150,7 +154,7 @@ export function AdminDashboard() {
       if (sortKey === "date") cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
       else if (sortKey === "severity")
         cmp = (severityRank(a) ?? -Infinity) - (severityRank(b) ?? -Infinity);
-      else cmp = (a.health_impact ?? -Infinity) - (b.health_impact ?? -Infinity);
+      else cmp = impactedCategories(a.impacts).length - impactedCategories(b.impacts).length;
       return cmp * dir;
     });
   }, [
@@ -244,7 +248,7 @@ export function AdminDashboard() {
           <StatCard label="Total reports" value={String(stats.total)} />
           <StatCard label="Last 7 days" value={String(stats.last7)} />
           <StatCard label="Avg severity (7d)" value={stats.avgSeverity} />
-          <StatCard label="Avg health impact (7d)" value={stats.avgHealth} />
+          <StatCard label="Reported impacts (7d)" value={String(stats.withImpacts)} />
         </div>
 
         {/* Filters */}
@@ -365,8 +369,12 @@ export function AdminDashboard() {
                   <Th onClick={() => toggleSort("severity")} active={sortKey === "severity"} dir={sortDir}>
                     Severity
                   </Th>
-                  <Th onClick={() => toggleSort("health")} active={sortKey === "health"} dir={sortDir}>
-                    Health
+                  <Th
+                    onClick={() => toggleSort("impacts")}
+                    active={sortKey === "impacts"}
+                    dir={sortDir}
+                  >
+                    Impacts
                   </Th>
                   <th className="px-3 py-2 font-semibold">Shoreline</th>
                   <th className="px-3 py-2 font-semibold">Extent</th>
@@ -416,8 +424,8 @@ export function AdminDashboard() {
                         {r.severity ?? <span className="text-ocean-400">—</span>}
                       </span>
                     </td>
-                    <td className="px-3 py-2">
-                      {r.health_impact ?? <span className="text-ocean-400">—</span>}
+                    <td className="px-3 py-2 text-xs text-ocean-700">
+                      {impactsSummary(r.impacts) || <span className="text-ocean-400">—</span>}
                     </td>
                     <td className="px-3 py-2 text-xs text-ocean-700">
                       {shorelineSummary(r) || <span className="text-ocean-400">—</span>}
@@ -567,9 +575,9 @@ function DetailModal({
             </>
           )}
           {extentSummary(report) && <Row label="Extent">{extentSummary(report)}</Row>}
-          <Row label="Health impact">
-            {report.health_impact === null ? "—" : `${report.health_impact} / 10`}
-          </Row>
+          {report.health_impact !== null && (
+            <Row label="Health impact">{`${report.health_impact} / 10`}</Row>
+          )}
           <Row label="Comments">{report.comments || "—"}</Row>
           <Row label="Status">
             <select

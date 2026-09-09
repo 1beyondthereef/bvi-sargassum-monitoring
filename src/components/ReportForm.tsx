@@ -6,7 +6,9 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 import { PhotoInput } from "@/components/PhotoInput";
 import { ScaleSlider } from "@/components/ScaleSlider";
 import { ChoiceGroup } from "@/components/ChoiceGroup";
+import { ImpactQuestions } from "@/components/ImpactQuestions";
 import type { DrawnArea } from "@/components/MapPicker";
+import type { ImpactAnswers } from "@/lib/types";
 import { compressImages } from "@/lib/image-utils";
 import { formatArea } from "@/lib/utils";
 import {
@@ -90,8 +92,9 @@ export function ReportForm() {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [photos, setPhotos] = useState<File[]>([]);
   const [severity, setSeverity] = useState<number | null>(null);
-  const [health, setHealth] = useState<number | null>(null);
   const [comments, setComments] = useState("");
+  // SPEC-V2 C6 — structured impacts, replacing the v1 1–10 health slider
+  const [impacts, setImpacts] = useState<ImpactAnswers>({});
 
   // SPEC-V2 C3 — land-based categorical assessment
   const [shoreAmount, setShoreAmount] = useState<string | null>(null);
@@ -113,7 +116,7 @@ export function ReportForm() {
   const showSeverity = reportType === "in_water";
 
   const isValid = useMemo(() => {
-    if (reportType === null || location === null || health === null) return false;
+    if (reportType === null || location === null) return false;
     if (comments.length > FIELD_LIMITS.commentsMaxChars) return false;
     if (showSeverity && severity === null) return false;
     if (showLand && (shoreAmount === null || shoreHeight === null || shoreCoverage === null)) {
@@ -123,7 +126,6 @@ export function ReportForm() {
   }, [
     reportType,
     location,
-    health,
     comments,
     showSeverity,
     severity,
@@ -138,8 +140,8 @@ export function ReportForm() {
     setLocation(null);
     setPhotos([]);
     setSeverity(null);
-    setHealth(null);
     setComments("");
+    setImpacts({});
     setShoreAmount(null);
     setShoreHeight(null);
     setShoreCoverage(null);
@@ -181,8 +183,10 @@ export function ReportForm() {
       body.append("latitude", String(location!.lat));
       body.append("longitude", String(location!.lng));
       body.append("report_type", String(reportType));
-      body.append("health_impact", String(health));
       body.append("comments", comments.trim());
+      if (Object.keys(impacts).length > 0) {
+        body.append("impacts", JSON.stringify(impacts));
+      }
 
       if (showSeverity && severity !== null) {
         body.append("severity", String(severity));
@@ -379,18 +383,10 @@ export function ReportForm() {
 
           <FieldCard
             index={++step}
-            title="Health impact"
-            required
-            caption="Decomposing sargassum can release hydrogen sulfide gas. Your answer helps the Ministry monitor community health effects."
+            title="Did you experience any impacts?"
+            caption="Decomposing sargassum can release hydrogen sulfide gas. Tick anything that applies — every question here is optional."
           >
-            <ScaleSlider
-              value={health}
-              onChange={setHealth}
-              ariaLabel="Health impact, 1 to 10"
-              unsetHint="Select health impact"
-              minLabel="No effect on me"
-              maxLabel="Severe (headaches, breathing difficulty, nausea)"
-            />
+            <ImpactQuestions value={impacts} onChange={setImpacts} />
           </FieldCard>
 
           <FieldCard index={++step} title="Comments">
